@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NEBULA — gameplay cam frame</title>
+<style>
+@font-face { font-family: 'Iceberg'; src: url('../assets/fonts/iceberg-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; src: url('../assets/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); font-weight: 500; }
+:root {
+  --accent: #39FF88; --accent-light: hsl(145, 100%, 80%);
+  --purple: hsl(286, 90%, 59%); --yellow: hsl(54, 100%, 55%);
+  --white: #FFFFFF; --muted: #9FB8A8; --base: #0A0D0B;
+}
+/* OBS needs to see through everything that isn't the overlay */
+html, body { margin: 0; background: transparent; overflow: hidden; }
+body { font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<!-- Browser source size: 420 x 252. Put the cam source UNDER this, sized 384 x 216 at (18, 18) inside it. -->
+<svg width="420" height="252" viewBox="0 0 420 252" style="display:block">
+  <g transform="translate(18,18)">
+    <polygon points="0,20 20,0 384,0 384,196 364,216 0,216" fill="none" stroke="#39FF88" stroke-width="1.5"/>
+    <polygon points="20,0 200,0 196,-6 24,-6" fill="#39FF88"/>                     <!-- thick top tab -->
+    <circle cx="364" cy="216" r="3.5" fill="#39FF88"/>
+    <!-- purple corner brackets, just outside the box -->
+    <path d="M358,-8 H392 V26 M-8,190 V224 H26" fill="none" stroke="hsl(286, 90%, 59%)" stroke-width="3"/>   <!-- top-right + bottom-left, so they never touch the chat frame's brackets above -->
+    <text x="0" y="232" font-family="JetBrains Mono, monospace" font-size="9" letter-spacing="1.5" fill="#9FB8A8"><tspan fill="#39FF88">CAM.FEED</tspan> // NBL-01</text>
+    <rect x="2" y="-14" width="7" height="7" fill="hsl(54, 100%, 55%)"/>
+  </g>
+</svg>
+</body>
+</html>

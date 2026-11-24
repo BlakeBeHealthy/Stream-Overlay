@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NEBULA — Starting Soon (prototype)</title>
+<style>
+/* ===== FONTS (paths point at ../assets/fonts/ — same layout as your build) ===== */
+@font-face { font-family: 'Orbitron'; src: url('../assets/fonts/orbitron-latin-800-normal.woff2') format('woff2'); font-weight: 800; font-style: normal; }
+@font-face { font-family: 'Orbitron'; src: url('../assets/fonts/orbitron-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-style: normal; }
+/* brand font for the NEBULA wordmark (OFL, free for stream use) */
+@font-face { font-family: 'Iceberg'; src: url('../assets/fonts/iceberg-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-style: normal; }
+@font-face { font-family: 'JetBrains Mono'; src: url('../assets/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); font-weight: 500; font-style: normal; }
+
+/* ===== PALETTE ===== */
+:root {
+  --base:     #0A0D0B;
+  --accent:   #39FF88;               /* green: structure, main color */
+  --accent-light: hsl(145, 100%, 80%);  /* light green: NEBULA tag box */
+  --purple:   hsl(286, 90%, 59%);    /* corners, text undertone, squares */
+  --yellow:   hsl(54, 100%, 55%);    /* tag line, divider diamond, squares */
+  --white:    #FFFFFF;               /* resting: title + NEBULA tag */
+  --text:     #E8F5EC;
+  --muted:    #9FB8A8;
+
+  --title-shadow: var(--purple);
+  --undertone: .07em .07em 0 var(--purple);   /* em = scales with font size, so one rule fits small + big text */
+  --corner:       var(--purple);
+
+  /* ===== MOTION =====
+     velocity, no recoil: both curves stay inside 0..1, so nothing ever overshoots and snaps back */
+  --ease-out: cubic-bezier(.25, .6, .35, 1);   /* fast start, settles in: things ARRIVING */
+  --ease-in:  cubic-bezier(.6, 0, .8, .4);     /* slow start, speeds away: things LEAVING */
+  --zoom-in:  350ms;                           /* JS reads these two, so text starts the instant the zoom ends */
+  --zoom-out: 200ms;
+}
+
+html, body { margin: 0; background: var(--base); overflow: hidden; }
+.stage {
+  position: relative; width: 1920px; height: 1080px; overflow: hidden;
+  background: var(--base);
+  font-family: 'JetBrains Mono', monospace; color: var(--text);
+}
+
+/* ===== BACKGROUND: dot-matrix + scanlines ===== */
+.dots {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(57,255,136,0.10) 1px, transparent 1.6px);
+  background-size: 7px 7px;
+}
+.blocks span {   /* denser dot "masses" (fake point-cloud) */
+  position: absolute;
+  background-image: radial-gradient(rgba(57,255,136,0.22) 1.1px, transparent 1.7px);
+  background-size: 5px 4px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent);
+          mask-image: linear-gradient(to bottom, #000 30%, transparent);
+}
+.scan {
+  position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.2) 0 1px, transparent 1px 3px);
+}
+.vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.75) 100%);
+}
+
+/* ===== BORDER FRAME draws itself in on load ===== */
+@keyframes fadeIn { to { opacity: 1; } }
+.frame .draw { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.on .frame .draw { animation: draw 1s var(--ease-out) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.frame .late, .corners { opacity: 0; }
+.on .frame .late { animation: fadeIn .4s var(--ease-out) .7s forwards; }
+.on .corners     { animation: fadeIn .6s var(--ease-out) .4s forwards; }
+
+/* ===== WHITE TEXT RULE: add class="wt" to anything white ===== */
+.wt { color: var(--white); text-shadow: var(--undertone); }
+
+/* ===== TITLE ===== */
+.title {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  pointer-events: none;
+}
+.title > * { opacity: 0; }
+.title .tag { font-size: 22px; letter-spacing: 6px; color: var(--yellow); }
+.title h1 {
+  margin: 0; font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 132px; letter-spacing: 10px; line-height: 1;
+  color: var(--white);
+  text-shadow: 7px 7px 0 var(--title-shadow);   /* hard offset "color shadow" */
+}
+.title .divider { display: flex; align-items: center; gap: 24px; }
+.title .divider span { display: block; height: 2px; width: 260px; background: var(--accent); }
+.title .divider b { display: block; width: 10px; height: 10px; background: var(--yellow); transform: rotate(45deg); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; transform: rotate(45deg) scale(.7); } }
+.title .tonight { font-size: 20px; letter-spacing: 3px; }
+
+.on .title .tag     { animation: typeIn .5s steps(24) .6s forwards; }
+.on .title h1       { animation: glitchIn .7s steps(1) .85s forwards; }
+.on .title .divider { animation: fadeIn .4s var(--ease-out) 1.5s forwards; }
+.on .title .tonight { animation: fadeIn .4s var(--ease-out) 1.7s forwards; }
+@keyframes typeIn { 0% { opacity: 1; clip-path: inset(0 100% 0 0); } 100% { opacity: 1; clip-path: inset(0 0 0 0); } }
+@keyframes glitchIn {   /* steps(1): every keyframe is a hard cut, no motion between them */
+  0%  { opacity: 1; transform: translate(-14px, 0) skewX(-12deg); clip-path: inset(30% 0 45% 0); text-shadow: -7px 0 0 var(--purple), 7px 0 0 var(--accent); }
+  15% { opacity: 1; transform: translate(10px, 0);               clip-path: inset(0 0 70% 0); }
+  30% { opacity: 1; transform: translate(-4px, 0);               clip-path: inset(55% 0 0 0); }
+  45% { opacity: 0; }
+  55% { opacity: 1; transform: none; clip-path: inset(0); text-shadow: -4px 0 0 var(--purple), 4px 0 0 var(--accent); }
+  70% { opacity: 1; text-shadow: 7px 7px 0 var(--title-shadow); }
+  100%{ opacity: 1; transform: none; clip-path: inset(0); text-shadow: 7px 7px 0 var(--title-shadow); }
+}
+
+/* ===== bottom info ===== */
+.socials, .tagname { position: absolute; bottom: 88px; font-size: 18px; letter-spacing: 2px; opacity: 0; }
+.socials { left: 96px; display: flex; gap: 40px; color: var(--muted); }
+.socials b { font-weight: 500; }
+.tagname { right: 96px; bottom: 58px; display: flex; align-items: center; gap: 18px; }
+.tagname i { display: block; width: 22px; height: 22px; background: var(--accent-light); }
+.tagname svg { display: block; }
+.on .socials, .on .tagname { animation: fadeIn .6s var(--ease-out) 1.9s forwards; }
+
+/* ===== TERMINAL POPUP: the old intro panel, small, top-left, every so often ===== */
+.term {
+  position: absolute; left: 92px; top: 84px; width: 520px; height: 210px;
+  background: rgba(15, 61, 36, 0.28);
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 0 18px rgba(57,255,136,0.18), inset 0 0 40px rgba(57,255,136,0.06);
+  transform-origin: left center;
+  visibility: hidden;
+}
+.term .bar {
+  position: absolute; left: -1.5px; right: -1.5px; top: -1.5px; height: 8px;
+  background: var(--accent); box-shadow: 0 0 12px var(--accent);
+  transform: scaleX(0); transform-origin: left;
+}
+.term .head {
+  position: absolute; left: 16px; right: 16px; top: 18px;
+  display: flex; justify-content: space-between; font-size: 12px; letter-spacing: 1px; color: var(--accent);
+}
+.term .body {
+  position: absolute; left: 16px; right: 16px; top: 42px; bottom: 12px; overflow: hidden;
+  font-size: 11.5px; line-height: 1.6; color: var(--accent); white-space: pre;
+}
+.term .body .cur::after { content: '▌'; animation: blink .5s steps(1) infinite; }
+.term .fine {
+  position: absolute; left: 0; top: calc(100% + 8px); width: 300px;
+  font-size: 8px; line-height: 1.4; letter-spacing: .5px; color: var(--accent); opacity: .6;
+}
+.term.status-ok #tStatus { color: var(--white); text-shadow: var(--undertone); }
+
+/* open: bar shoots across, THEN the body unfolds */
+.term.open                { visibility: visible; animation: termIn .3s var(--ease-out) .3s both; }
+.term.open .bar           { animation: barIn .3s var(--ease-out) forwards; }
+@keyframes termIn { from { transform: scaleY(.04); } to { transform: scaleY(1); } }
+@keyframes barIn  { to { transform: scaleX(1); } }
+/* close: contents blank, squish to a solid bar, then gone */
+.term.close               { visibility: visible; animation: termOut .55s var(--ease-in) forwards; }
+.term.close > *           { opacity: 0; }
+.term.close .bar          { opacity: 1; transform: scaleX(1); }
+@keyframes termOut {
+  0%   { transform: scaleX(1);    background: rgba(15,61,36,.28); }
+  60%  { transform: scaleX(.035); background: var(--accent); }
+  100% { transform: scaleX(.035) scaleY(0); background: var(--accent); }
+}
+
+/* ===== SQUARES: 4-step drill ===== */
+.marker {
+  position: absolute; width: 18px; height: 18px; box-sizing: border-box;
+  border: 2px solid var(--purple);
+  transform: scale(0);
+  --c: var(--purple);
+}
+.marker.y { border-color: var(--yellow); --c: var(--yellow); }
+.marker::before { content: ''; position: absolute; inset: 3px; background: var(--c); }
+.marker .lbl {
+  position: absolute; left: 26px; top: 1px;
+  font-size: 8.5px; letter-spacing: .6px; white-space: nowrap; color: var(--c);
+  border-bottom: 2px solid var(--c); padding-bottom: 1px;
+}
+.marker .lbl:empty { border-bottom-color: transparent; }
+.marker .lbl.typing::after { content: '▌'; animation: blink .3s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+#links polyline { fill: none; stroke: var(--yellow); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 0.1 8;
+              filter: drop-shadow(0 0 4px var(--yellow)); }
+
+#links polyline.lead { stroke-dasharray: none; stroke-width: 1.5; filter: drop-shadow(0 0 3px var(--yellow)); }
+
+/* ===== CALLOUT (shard reference): anchor -> leader line -> tag + stacked label ===== */
+.marker.small { width: 12px; height: 12px; border-width: 1.5px; }
+.marker.small::before { inset: 2.5px; }
+.callout { position: absolute; --c: var(--yellow); }
+.callout .tag {
+  position: absolute; left: -16px; top: -16px; width: 16px; height: 16px;
+  background: var(--yellow);
+  clip-path: polygon(0 0, 100% 0, 100% 68%, 68% 100%, 0 100%);   /* clipped corner */
+  transform: scale(0);
+}
+.callout .tag.show   { animation: pop var(--zoom-in) var(--ease-out) forwards; }
+.callout .tag.vanish { animation: boxOut var(--zoom-out) var(--ease-in) forwards; }
+.callout .txt {
+  position: absolute; left: 4px; bottom: 4px;
+  font-size: 8px; line-height: 1.3; letter-spacing: .6px; white-space: pre; color: var(--yellow);
+}
+.callout .txt div:first-child { font-size: 9.5px; letter-spacing: 1.2px; }
+.callout .txt .cur::after { content: '▌'; animation: blink .3s steps(1) infinite; }
+.callout.retract .txt { animation: labelOut .35s var(--ease-in) forwards; }
+
+/* 1. box zooms in */
+.marker.show { animation: pop var(--zoom-in) var(--ease-out) forwards; }
+@keyframes pop {
+  from { transform: scale(0); filter: brightness(3); }
+  to   { transform: scale(1); filter: brightness(1) drop-shadow(0 0 6px var(--c)); }
+}
+/* 2. label types out (JS) */
+/* 3. label slides left into the box */
+.marker.retract .lbl { animation: labelOut .35s var(--ease-in) forwards; }
+@keyframes labelOut {
+  from { clip-path: inset(0 0 0 0);    transform: translateX(0); }
+  to   { clip-path: inset(0 100% 0 0); transform: translateX(-26px); }
+}
+/* 4. box zooms out */
+.marker.vanish { animation: boxOut var(--zoom-out) var(--ease-in) forwards; }
+@keyframes boxOut { from { transform: scale(1); } to { transform: scale(0); } }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <!-- background -->
+  <div class="dots"></div>
+  <div class="blocks">
+    <span style="left:60px;  top:120px; width:220px; height:520px"></span>
+    <span style="left:300px; top:60px;  width:140px; height:300px"></span>
+    <span style="left:1650px;top:90px;  width:230px; height:600px"></span>
+    <span style="left:1480px;top:180px; width:150px; height:260px"></span>
+    <span style="left:520px; top:720px; width:880px; height:260px"></span>
+    <span style="left:140px; top:760px; width:300px; height:220px"></span>
+  </div>
+
+  <!-- corner plates: BEHIND the green frame lines -->
+  <svg class="corners" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;left:0;top:0">
+    <g fill="var(--corner)">
+      <polygon points="0,0 190,0 176,10 44,10 10,44 10,190 0,204"/>
+      <polygon points="1920,0 1730,0 1744,10 1876,10 1910,44 1910,190 1920,204"/>
+      <polygon points="0,1080 190,1080 176,1070 44,1070 10,1036 10,890 0,876"/>
+      <polygon points="1920,1080 1730,1080 1744,1070 1876,1070 1910,1036 1910,890 1920,876"/>
+    </g>
+  </svg>
+
+  <!-- green border frame -->
+  <svg class="frame" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;left:0;top:0">
+    <g fill="none" stroke="var(--accent)" stroke-width="1.5" opacity=".85">
+      <path class="draw" pathLength="1" d="M0,34 L520,34 L548,14 L1372,14 L1400,34 L1920,34"/>
+      <path class="draw" pathLength="1" d="M1920,1046 L1400,1046 L1372,1066 L548,1066 L520,1046 L0,1046"/>
+      <path class="draw" pathLength="1" d="M28,1080 L28,750 L46,730 L46,350 L28,330 L28,0"/>
+      <path class="draw" pathLength="1" d="M1892,0 L1892,330 L1874,350 L1874,730 L1892,750 L1892,1080"/>
+    </g>
+    <g class="late">
+      <g stroke="var(--accent)" stroke-width="5">
+        <path d="M580,14 L780,14 M796,14 L812,14 M824,14 L832,14"/>
+        <path d="M1140,1066 L1340,1066 M1108,1066 L1124,1066 M1088,1066 L1096,1066"/>
+        <path d="M46,380 L46,520"/><path d="M1874,560 L1874,700"/>
+      </g>
+      <g fill="var(--accent)">
+        <circle cx="548" cy="14" r="3.5"/><circle cx="1372" cy="14" r="3.5"/>
+        <circle cx="548" cy="1066" r="3.5"/><circle cx="1372" cy="1066" r="3.5"/>
+        <circle cx="46" cy="350" r="3.5"/><circle cx="46" cy="730" r="3.5"/>
+        <circle cx="1874" cy="350" r="3.5"/><circle cx="1874" cy="730" r="3.5"/>
+        <polygon points="60,40 104,40 112,46 104,52 60,52"/>
+        <polygon points="118,40 130,40 138,46 130,52 118,52 126,46" opacity=".55"/>
+        <polygon points="142,40 154,40 162,46 154,52 142,52 150,46" opacity=".25"/>
+        <polygon points="1860,1028 1816,1028 1808,1034 1816,1040 1860,1040"/>
+        <polygon points="1802,1028 1790,1028 1782,1034 1790,1040 1802,1040 1794,1034" opacity=".55"/>
+        <polygon points="1778,1028 1766,1028 1758,1034 1766,1040 1778,1040 1770,1034" opacity=".25"/>
+      </g>
+      <g font-family="JetBrains Mono, monospace" font-size="11" letter-spacing="2" fill="var(--muted)">
+        <text x="60" y="24">NBL-01 // SYS.ONLINE</text>
+        <text x="1860" y="24" text-anchor="end">STANDBY // 01</text>
+        <text x="960" y="1057" text-anchor="middle">NEBULA · BROADCAST SYSTEM</text>
+      </g>
+      <circle r="4" fill="var(--accent)"><animateMotion dur="12s" repeatCount="indefinite" path="M0,34 L520,34 L548,14 L1372,14 L1400,34 L1920,34"/></circle>
+      <circle r="4" fill="var(--accent)"><animateMotion dur="12s" begin="-6s" repeatCount="indefinite" path="M1920,1046 L1400,1046 L1372,1066 L548,1066 L520,1046 L0,1046"/></circle>
+    </g>
+  </svg>
+
+  <svg id="links" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;left:0;top:0;pointer-events:none"></svg>
+  <div class="term" id="term">
+    <div class="bar"></div>
+    <div class="head"><span id="tAddr">LOAD ADDRESS: 0x4E42554C</span><span id="tStatus">STATUS:</span></div>
+    <div class="body" id="tBody"></div>
+    <div class="fine">ONLY NBL-CERTIFIED OPERATORS MAY ACCESS OR DISABLE THIS DEVICE.</div>
+  </div>
+  <div id="ambient"></div>
+
+  <div class="title">
+    <span class="tag">// TRANSMISSION INCOMING</span>
+    <h1>STARTING SOON</h1>
+    <div class="divider"><span></span><b></b><span></span></div>
+    <span class="tonight wt">TONIGHT: [GAME / PLAN FOR THE STREAM]</span>
+  </div>
+
+  <div class="socials"><span>TWITCH <b class="wt">/[HANDLE]</b></span><span>YOUTUBE <b class="wt">@[HANDLE]</b></span><span>KICK <b class="wt">/[HANDLE]</b></span></div>
+
+  <div class="scan"></div>
+  <div class="vignette"></div>
+  <!-- brand sits ABOVE the scanlines + vignette so it never gets dimmed -->
+  <div class="tagname"><i></i><span id="brand"></span></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const cssMs = name => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+
+/* ---------- squares: one drill step at a time ---------- */
+function makeMarker(x, y, label, yellow) {
+  const m = document.createElement('div');
+  m.className = 'marker' + (yellow ? ' y' : '');
+  m.style.left = x + 'px'; m.style.top = y + 'px';
+  m.dataset.l = label;
+  m.innerHTML = '<span class="lbl"></span>';
+  return m;
+}
+async function mAppear(m)  { m.classList.add('show'); await wait(cssMs('--zoom-in')); }       // 1. box zooms in
+async function mType(m) {                                                                       // 2. text writes out
+  const lbl = m.querySelector('.lbl'), txt = m.dataset.l;
+  lbl.classList.add('typing');
+  for (let i = 1; i <= txt.length; i++) { lbl.textContent = txt.slice(0, i); await wait(45); }
+  lbl.classList.remove('typing');
+}
+async function mRetract(m) { m.classList.add('retract'); await wait(350); }                    // 3. text slides into box
+async function mVanish(m)  { m.classList.remove('show'); m.classList.add('vanish'); await wait(cssMs('--zoom-out')); } // 4. box zooms out
+
+const LABELS = ['NBL_SYS_0x1F','UPLINK.OK','SIG.LOCK','PKT_0x3A','NODE_07','CH.RELAY','SYNC.OK','BUF_0x9C'];
+const BLOCKED = [ {x1: 220, y1: 360, x2: 1700, y2: 720},   // title area
+                  {x1:  60, y1:  60, x2:  660, y2: 340},   // terminal popup
+                  {x1:  60, y1: 940, x2: 1860, y2: 1020},   // socials row
+                  {x1: 160, y1: 780, x2: 1760, y2: 940} ];  // bottom band: reserved for the chain
+function freeSpot() {
+  for (let i = 0; i < 30; i++) {
+    const x = 90 + Math.random() * 1700, y = 80 + Math.random() * 860;
+    const hit = BLOCKED.some(b => x > b.x1 - 140 && x < b.x2 && y > b.y1 - 20 && y < b.y2);
+    const inCallout = calloutBox && x > calloutBox[0] - 140 && x < calloutBox[2] && y > calloutBox[1] - 20 && y < calloutBox[3];
+    const crowded = inCallout || [...$('ambient').children].some(m =>          // keep squares apart so labels don't overlap
+      Math.abs(parseFloat(m.style.left) - x) < 220 && Math.abs(parseFloat(m.style.top) - y) < 120);
+    if (!hit && !crowded) return [Math.round(x), Math.round(y)];
+  }
+  return null;
+}
+function spawnLoop() {
+  const box = $('ambient');
+  const spot = box.querySelectorAll('.marker:not(.chain)').length < 2 ? freeSpot() : null;
+  if (spot) {
+    const [x, y] = spot;
+    const m = makeMarker(x, y, LABELS[Math.floor(Math.random() * LABELS.length)], true);
+    box.appendChild(m);
+    (async () => {
+      await mAppear(m);
+      await mType(m);
+      await wait(1800 + Math.random() * 1500);   // hold
+      await mRetract(m);
+      await mVanish(m);
+      m.remove();
+    })();
+  }
+  setTimeout(spawnLoop, 5000 + Math.random() * 4000);   // one every 5-9s
+}
+
+/* ---------- chain: 3-4 squares on the bottom, linked with right-angle lines ---------- */
+const easeOut = t => 1 - Math.pow(1 - t, 3);         // fast start, settles: line ARRIVING
+const easeIn  = t => t * t * t;                       // slow start, speeds off: line LEAVING
+
+// show the first `len` pixels of a route (list of [x,y] corners) on a <polyline>
+function routeUpTo(route, len) {
+  const out = [route[0]];
+  for (let i = 1; i < route.length; i++) {
+    const [ax, ay] = route[i - 1], [bx, by] = route[i];
+    const seg = Math.hypot(bx - ax, by - ay);
+    if (len >= seg) { out.push(route[i]); len -= seg; continue; }
+    const k = len / seg; out.push([ax + (bx - ax) * k, ay + (by - ay) * k]); break;
+  }
+  return out.map(p => p.join(',')).join(' ');
+}
+function routeLength(route) {
+  let L = 0; for (let i = 1; i < route.length; i++) L += Math.hypot(route[i][0] - route[i-1][0], route[i][1] - route[i-1][1]);
+  return L;
+}
+function animateRoute(pl, route, reverse = false) {
+  const total = routeLength(route);
+  const dur = reverse ? Math.max(200, total * 0.45) : Math.max(260, total * 0.8);   // longer line = longer draw, same feel
+  return new Promise(res => {
+    const t0 = performance.now();
+    (function step(now) {
+      const t = Math.min(1, (now - t0) / dur);
+      const f = reverse ? 1 - easeIn(t) : easeOut(t);
+      pl.setAttribute('points', routeUpTo(route, total * f));
+      t < 1 ? requestAnimationFrame(step) : res();
+    })(t0);
+  });
+}
+
+async function chain() {
+  const n = 3 + Math.round(Math.random());             // 3 or 4 squares
+  const span = 1400 / n;
+  const baseY = Math.round(830 + Math.random() * 40);
+  const xs = [];
+  for (let i = 0; i < n; i++) xs.push(Math.round(240 + i * span + Math.random() * (span - 220)));
+
+  // 1 or 2 sharp 90-degree turns per chain, everything else dead straight
+  const dy = (Math.random() < 0.5 ? -1 : 1) * Math.round(50 + Math.random() * 30);
+  const pts = xs.map(x => [x, baseY]);
+  const routes = [];
+  if (Math.random() < 0.5) {
+    // TWO turns: one segment steps up/down halfway (a "Z" jog); squares after it sit on the new level
+    const j = Math.floor(Math.random() * (n - 1));
+    for (let i = j + 1; i < n; i++) pts[i][1] = baseY + dy;
+    for (let i = 0; i < n - 1; i++) {
+      const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+      if (i === j) { const mx = Math.round((ax + bx) / 2); routes.push([[ax, ay], [mx, ay], [mx, by], [bx, by]]); }
+      else routes.push([[ax, ay], [bx, by]]);
+    }
+  } else {
+    // ONE turn: the last square sits off the line; the line runs flat, then turns straight into it
+    pts[n - 1][1] = baseY + dy;
+    for (let i = 0; i < n - 1; i++) {
+      const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+      routes.push(i === n - 2 ? [[ax, ay], [bx, ay], [bx, by]] : [[ax, ay], [bx, by]]);
+    }
+  }
+
+  const svg = $('links'), box = $('ambient'), ms = [], lines = [];
+  for (let i = 0; i < n; i++) {
+    const [x, y] = pts[i];
+    const m = makeMarker(x - 9, y - 9, i === n - 1 ? LABELS[Math.floor(Math.random() * LABELS.length)] : '', true);
+    m.classList.add('chain'); box.appendChild(m); ms.push(m);
+    await mAppear(m);                                   // square appears...
+    if (i === n - 1) await mType(m);                    // (last one gets the label)
+    if (i < n - 1) {                                    // ...then the line runs to the next spot
+      const pl = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      svg.appendChild(pl); lines.push(pl);
+      await animateRoute(pl, routes[i]);
+    }
+  }
+  await wait(3500);                                     // hold
+
+  // tear down in reverse: label in, then each square goes and its line pulls back
+  await mRetract(ms[n - 1]);
+  for (let i = n - 1; i >= 0; i--) {
+    await mVanish(ms[i]); ms[i].remove();
+    if (i > 0) { await animateRoute(lines[i - 1], routes[i - 1], true); lines[i - 1].remove(); }
+  }
+}
+/* ---------- terminal popup ---------- */
+const TERM_LINES = [
+  '[uplink] mount TWITCH ........ OK', '[uplink] mount YOUTUBE ....... OK', '[uplink] mount KICK .......... OK',
+  'ping chat.relay ............ 24ms', 'cam.feed : 1920x1080 @ 60 ..... OK', 'audio.bus : -14 LUFS .......... OK',
+  'scene : STARTING_SOON', 'relocation offset is: 0x00B1A5E0', 'NAND CHECK : org_valid=1, blk_addr=5',
+  'sync clock ................... OK', 'nebula_core v2.6 ............. OK', 'buffer 0x9C : flushed',
+];
+async function terminal() {
+  const t = $('term'), body = $('tBody'), st = $('tStatus');
+  body.innerHTML = ''; st.textContent = 'STATUS: RUNNING';
+  t.classList.remove('close', 'status-ok');
+  $('tAddr').textContent = 'LOAD ADDRESS: 0x' + Math.floor(Math.random() * 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, '0');
+  t.classList.add('open');
+  await wait(650);                                       // bar, then body
+
+  const pick = [...TERM_LINES].sort(() => Math.random() - .5).slice(0, 6);
+  for (const line of pick) {                             // type line by line
+    body.querySelectorAll('.cur').forEach(c => c.classList.remove('cur'));
+    const el = document.createElement('div'); el.className = 'cur'; body.appendChild(el);
+    for (let i = 1; i <= line.length; i++) { el.textContent = line.slice(0, i); await wait(18); }
+    await wait(140);
+  }
+  body.querySelectorAll('.cur').forEach(c => c.classList.remove('cur'));
+  st.textContent = 'STATUS: OK'; t.classList.add('status-ok');
+  await wait(3000);                                      // hold
+
+  t.classList.remove('open'); t.classList.add('close');
+  await wait(600);
+  t.classList.remove('close');
+}
+async function termLoop() {
+  await terminal();
+  setTimeout(termLoop, 30000 + Math.random() * 15000);   // every ~30-45s
+}
+
+/* ---------- callout: like the yellow tags pinned to buildings in the shard reference ---------- */
+let calloutBox = null;                                   // area in use, so single squares stay clear
+const CALLOUT_TEXT = [
+  ['NEBULA SYSTEMS', 'SIGNAL EXAMINATION REPORT'],
+  ['NEBULA SYSTEMS', 'UPLINK STATUS REPORT'],
+  ['NBL RELAY',      'CHANNEL INTEGRITY SCAN'],
+  ['NEBULA SYSTEMS', 'NODE DIAGNOSTIC'],
+];
+async function callout() {
+  const d = 34 + Math.round(Math.random() * 20);          // diagonal leg
+  const h = 150 + Math.round(Math.random() * 70);         // flat leg (text sits on top of it)
+  const ax = Math.round(900 + d + h + Math.random() * (1800 - 900 - d - h));
+  const ay = Math.round(170 + Math.random() * 150);
+  const ex = ax - d, ey = ay - d;                         // 45-degree bend
+  const tx = ex - h, ty = ey;                             // tag end
+  calloutBox = [tx - 24, ty - 34, ax + 10, ay + 10];
+
+  const box = $('ambient'), svg = $('links');
+  const anchor = makeMarker(ax - 6, ay - 6, '', true); anchor.classList.add('small', 'chain');
+  box.appendChild(anchor);
+  await mAppear(anchor);                                  // 1. anchor point
+
+  const pl = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  pl.classList.add('lead'); svg.appendChild(pl);
+  const route = [[ax, ay], [ex, ey], [tx, ty]];
+  await animateRoute(pl, route);                          // 2. leader line runs out to the tag spot
+
+  const c = document.createElement('div');
+  c.className = 'callout'; c.style.left = tx + 'px'; c.style.top = ty + 'px';
+  c.innerHTML = '<div class="tag"></div><div class="txt"></div>';
+  box.appendChild(c);
+  const tag = c.querySelector('.tag'), txt = c.querySelector('.txt');
+  tag.classList.add('show'); await wait(cssMs('--zoom-in')); // 3. tag square
+
+  const lines = [...CALLOUT_TEXT[Math.floor(Math.random() * CALLOUT_TEXT.length)],
+                 'NBL_' + Math.floor(Math.random() * 0xFFF).toString(16).toUpperCase().padStart(3, '0') +
+                 '_' + Math.floor(Math.random() * 0xFFFFF).toString(16).toUpperCase()];
+  for (const line of lines) {                             // 4. label types out, line by line
+    txt.querySelectorAll('.cur').forEach(e => e.classList.remove('cur'));
+    const el = document.createElement('div'); el.className = 'cur'; txt.appendChild(el);
+    for (let i = 1; i <= line.length; i++) { el.textContent = line.slice(0, i); await wait(22); }
+  }
+  txt.querySelectorAll('.cur').forEach(e => e.classList.remove('cur'));
+  await wait(4000);                                       // hold
+
+  c.classList.add('retract'); await wait(350);            // tear down in reverse
+  tag.classList.remove('show'); tag.classList.add('vanish'); await wait(cssMs('--zoom-out'));
+  c.remove();
+  await animateRoute(pl, route, true); pl.remove();
+  await mVanish(anchor); anchor.remove();
+  calloutBox = null;
+}
+async function calloutLoop() {
+  await callout();
+  setTimeout(calloutLoop, 25000 + Math.random() * 15000); // every ~25-40s
+}
+
+async function chainLoop() {
+  await chain();
+  setTimeout(chainLoop, 18000 + Math.random() * 10000);   // every ~18-28s
+}
+
+/* ---------- on load: frame draws, title lands, squares start ---------- */
+
+/* ---------- NEBULA wordmark: Iceberg + 35-degree slash across the whole N (built as SVG so the cut is real) ---------- */
+async function brandMark(host, size) {
+  await document.fonts.load(`400 ${size}px 'Iceberg'`);
+  const NS = 'http://www.w3.org/2000/svg', mk = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); p && p.appendChild(e); return e; };
+  const c = document.createElement('canvas'); c.width = size * 2; c.height = size * 2;
+  const g = c.getContext('2d'); g.font = `400 ${size}px 'Iceberg'`;
+  // ink edges of the N (where the slash starts and ends)
+  g.fillStyle = '#fff'; const ox = size * .2, base = size * 1.4; g.fillText('N', ox, base);
+  const asc = g.measureText('N').actualBoundingBoxAscent, row = g.getImageData(0, Math.round(base - asc * .5), c.width, 1).data;
+  let nL = null, nR = null; for (let x = 0; x < c.width; x++) if (row[x * 4 + 3] > 128) { nL ??= x - ox; nR = x - ox; }
+  // letter positions
+  const sp = size * .1, xs = []; let x = 0;
+  for (const ch of 'NEBULA') { xs.push(x); x += g.measureText(ch).width + sp; }
+  const W = x - sp, und = size * .07, top = -asc, H = asc, pad = 4;
+  const svg = mk('svg', { viewBox: `${-pad} ${top - pad} ${W + und + pad * 2} ${H + und + pad * 2}`, width: W + und + pad * 2, height: H + und + pad * 2 }, host);
+  const id = 'brandcut' + Math.random().toString(36).slice(2, 7);
+  const mask = mk('mask', { id, maskUnits: 'userSpaceOnUse', x: -pad, y: top - pad, width: W + und + pad * 2, height: H + und + pad * 2 }, mk('defs', {}, svg));
+  mk('rect', { x: -pad, y: top - pad, width: W + und + pad * 2, height: H + und + pad * 2, fill: '#fff' }, mask);
+  const xa = nL - 2, xb = nR + 2 + und, mid = top + H * .5, rise = (xb - xa) * Math.tan(35 * Math.PI / 180), gap = Math.max(1.5, size * .05);
+  mk('polygon', { points: `${xa},${mid + rise / 2 - gap / 2} ${xb},${mid - rise / 2 - gap / 2} ${xb},${mid - rise / 2 + gap / 2} ${xa},${mid + rise / 2 + gap / 2}`, fill: '#000' }, mask);
+  for (const [dx, fill] of [[und, 'var(--accent)'], [0, 'var(--white)']])
+    [...'NEBULA'].forEach((ch, i) => {
+      const t = mk('text', { x: xs[i] + dx, y: dx, 'font-family': 'Iceberg', 'font-size': size, fill }, svg);
+      if (i === 0) t.setAttribute('mask', `url(#${id})`);
+      t.textContent = ch;
+    });
+}
+
+window.addEventListener('load', async () => {
+  brandMark($('brand'), 52);   // ~same width as the LOADING header
+  $('stage').classList.add('on');
+  await wait(2400);
+  chainLoop();
+  setTimeout(spawnLoop, 6000);
+  setTimeout(termLoop, 9000);
+  setTimeout(calloutLoop, 16000);
+});
+
+/* fit the 1920x1080 stage to whatever window is previewing it (OBS at 1920x1080 = scale 1) */
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  const st = $('stage'); st.style.transformOrigin = '0 0'; st.style.transform = `scale(${s})`;
+}
+addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

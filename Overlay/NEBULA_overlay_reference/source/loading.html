@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NEBULA — Loading (prototype)</title>
+<style>
+/* ===== FONTS (paths point at ../assets/fonts/ — same layout as your build) ===== */
+@font-face { font-family: 'Orbitron'; src: url('../assets/fonts/orbitron-latin-800-normal.woff2') format('woff2'); font-weight: 800; font-style: normal; }
+@font-face { font-family: 'Orbitron'; src: url('../assets/fonts/orbitron-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-style: normal; }
+/* brand font for the NEBULA wordmark (OFL, free for stream use) */
+@font-face { font-family: 'Iceberg'; src: url('../assets/fonts/iceberg-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-style: normal; }
+@font-face { font-family: 'JetBrains Mono'; src: url('../assets/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); font-weight: 500; font-style: normal; }
+
+/* ===== PALETTE ===== */
+:root {
+  --base:     #0A0D0B;
+  --accent:   #39FF88;               /* green: structure, main color */
+  --accent-light: hsl(145, 100%, 80%);  /* light green: NEBULA tag box */
+  --purple:   hsl(286, 90%, 59%);    /* corners, text undertone, squares */
+  --yellow:   hsl(54, 100%, 55%);    /* tag line, divider diamond, squares */
+  --white:    #FFFFFF;               /* resting: title + NEBULA tag */
+  --text:     #E8F5EC;
+  --muted:    #9FB8A8;
+
+  --title-shadow: var(--purple);
+  --undertone: .07em .07em 0 var(--purple);   /* em = scales with font size, so one rule fits small + big text */
+  --corner:       var(--purple);
+
+  /* ===== MOTION =====
+     velocity, no recoil: both curves stay inside 0..1, so nothing ever overshoots and snaps back */
+  --ease-out: cubic-bezier(.25, .6, .35, 1);   /* fast start, settles in: things ARRIVING */
+  --ease-in:  cubic-bezier(.6, 0, .8, .4);     /* slow start, speeds away: things LEAVING */
+  --zoom-in:  350ms;                           /* JS reads these two, so text starts the instant the zoom ends */
+  --zoom-out: 200ms;
+}
+
+html, body { margin: 0; background: var(--base); overflow: hidden; }
+.stage {
+  position: relative; width: 1920px; height: 1080px; overflow: hidden;
+  background: var(--base);
+  font-family: 'JetBrains Mono', monospace; color: var(--text);
+}
+
+/* ===== BACKGROUND: dot-matrix + scanlines ===== */
+.dots {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(57,255,136,0.10) 1px, transparent 1.6px);
+  background-size: 7px 7px;
+}
+.blocks span {   /* denser dot "masses" (fake point-cloud) */
+  position: absolute;
+  background-image: radial-gradient(rgba(57,255,136,0.22) 1.1px, transparent 1.7px);
+  background-size: 5px 4px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent);
+          mask-image: linear-gradient(to bottom, #000 30%, transparent);
+}
+.scan {
+  position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.2) 0 1px, transparent 1px 3px);
+}
+.vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.75) 100%);
+}
+
+/* ===== BORDER FRAME draws itself in on load ===== */
+@keyframes fadeIn { to { opacity: 1; } }
+.frame .draw { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.on .frame .draw { animation: draw 1s var(--ease-out) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.frame .late, .corners { opacity: 0; }
+.on .frame .late { animation: fadeIn .4s var(--ease-out) .7s forwards; }
+.on .corners     { animation: fadeIn .6s var(--ease-out) .4s forwards; }
+
+/* ===== WHITE TEXT RULE: add class="wt" to anything white ===== */
+.wt { color: var(--white); text-shadow: var(--undertone); }
+
+
+/* ===== HEADER ===== */
+.header { position: absolute; left: 80px; top: 58px; width: 1760px; height: 60px; display: flex; align-items: flex-end; justify-content: space-between; }
+.header .left { display: flex; flex-direction: column; gap: 6px; }
+.header .tag { font-size: 13px; letter-spacing: 5px; color: var(--yellow); opacity: 0; }
+.header h1 { margin: 0; font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 34px; letter-spacing: 6px; line-height: 1; opacity: 0; }
+.live { display: flex; align-items: center; gap: 10px; font-size: 18px; letter-spacing: 4px; opacity: 0; }
+.live i { display: block; width: 10px; height: 10px; background: var(--purple); box-shadow: 0 0 8px var(--purple); animation: livePulse 1.6s ease-in-out infinite; }
+@keyframes livePulse { 50% { opacity: .3; } }
+.on .header .tag { animation: typeIn .4s steps(18) .5s forwards; }
+.on .header h1   { animation: glitchSm .5s steps(1) .7s forwards; }
+.on .live        { animation: fadeIn .4s var(--ease-out) 1s forwards; }
+@keyframes typeIn { 0% { opacity: 1; clip-path: inset(0 100% 0 0); } 100% { opacity: 1; clip-path: inset(0 0 0 0); } }
+@keyframes glitchSm {
+  0%  { opacity: 1; transform: translateX(-8px); clip-path: inset(20% 0 50% 0); text-shadow: -4px 0 0 var(--purple), 4px 0 0 var(--accent); }
+  25% { opacity: 1; transform: translateX(6px);  clip-path: inset(55% 0 0 0); }
+  45% { opacity: 0; }
+  60% { opacity: 1; transform: none; clip-path: inset(0); text-shadow: -2px 0 0 var(--purple), 2px 0 0 var(--accent); }
+  100%{ opacity: 1; transform: none; clip-path: inset(0); text-shadow: var(--undertone); }
+}
+
+/* dots tick in one at a time, like a terminal waiting (steps = hard cuts, no motion) */
+.ell::after { content: ''; animation: ell 2s steps(1) infinite; }
+@keyframes ell { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+
+/* ===== SOURCE FRAMES (cam + chat): the OBS sources sit ON TOP of this page, inside these boxes ===== */
+.src {
+  position: absolute;
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 0 18px rgba(57,255,136,0.16);
+  transform-origin: left center;
+  visibility: hidden;
+}
+.src .bar {
+  position: absolute; left: -1.5px; right: -1.5px; top: -1.5px; height: 8px;
+  background: var(--accent); box-shadow: 0 0 12px var(--accent);
+  transform: scaleX(0); transform-origin: left;
+}
+.src .fine {
+  position: absolute; left: 0; top: calc(100% + 10px);
+  font-size: 10px; letter-spacing: 1.5px; color: var(--muted); white-space: nowrap;
+}
+.src .fine b { font-weight: 500; color: var(--accent); }
+.src .fine.r { left: auto; right: 0; }
+/* purple corner brackets, just outside the box so the cam never covers them */
+.src .bk { position: absolute; width: 22px; height: 22px; border: 3px solid var(--purple); }
+.src .bk.tl { left: -10px;  top: -10px;    border-right: 0; border-bottom: 0; }
+.src .bk.tr { right: -10px; top: -10px;    border-left: 0;  border-bottom: 0; }
+.src .bk.bl { left: -10px;  bottom: -10px; border-right: 0; border-top: 0; }
+.src .bk.br { right: -10px; bottom: -10px; border-left: 0;  border-top: 0; }
+.src.open      { visibility: visible; animation: srcIn .35s var(--ease-out) .3s both; }
+.src.open .bar { animation: barIn .3s var(--ease-out) forwards; }
+@keyframes srcIn { from { transform: scaleY(.03); } to { transform: scaleY(1); } }
+@keyframes barIn { to { transform: scaleX(1); } }
+
+#cam  { left: 80px;   top: 160px; width: 1224px; height: 702px; }
+#chat { left: 1384px; top: 160px; width: 456px;  height: 702px; background: rgba(10,13,11,0.55); }
+#chat .chead {
+  position: absolute; left: 20px; right: 20px; top: 22px;
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(57,255,136,0.35);
+}
+#chat .chead span:first-child { font-size: 13px; letter-spacing: 4px; color: var(--yellow); }
+#chat .chead span:last-child  { font-size: 10px; letter-spacing: 2px; color: var(--muted); }
+
+/* preview-only placeholders: hidden in OBS (load the file with ?obs at the end of the URL) */
+.ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+      color: var(--muted); font-size: 14px; letter-spacing: 3px; background: rgba(17,24,20,.6); }
+.ph b { font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 36px; letter-spacing: 6px; color: rgba(232,245,236,.25); }
+#chat .ph { top: 70px; background: none; }
+.obs .ph { display: none; }
+
+/* ===== bottom info ===== */
+.socials, .tagname { position: absolute; top: 912px; font-size: 18px; letter-spacing: 2px; opacity: 0; }
+.socials { left: 80px; color: var(--muted); }
+.tagname { right: 80px; top: 914px; display: flex; align-items: center; gap: 18px; }
+.tagname i { display: block; width: 22px; height: 22px; background: var(--accent-light); }
+.tagname svg { display: block; }
+.on .socials, .on .tagname { animation: fadeIn .5s var(--ease-out) 1.4s forwards; }
+
+/* ===== SQUARES: 4-step drill ===== */
+.marker {
+  position: absolute; width: 18px; height: 18px; box-sizing: border-box;
+  border: 2px solid var(--purple);
+  transform: scale(0);
+  --c: var(--purple);
+}
+.marker.y { border-color: var(--yellow); --c: var(--yellow); }
+.marker::before { content: ''; position: absolute; inset: 3px; background: var(--c); }
+.marker .lbl {
+  position: absolute; left: 26px; top: 1px;
+  font-size: 8.5px; letter-spacing: .6px; white-space: nowrap; color: var(--c);
+  border-bottom: 2px solid var(--c); padding-bottom: 1px;
+}
+.marker .lbl:empty { border-bottom-color: transparent; }
+.marker .lbl.typing::after { content: '▌'; animation: blink .3s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+#links polyline { fill: none; stroke: var(--yellow); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 0.1 9;
+              filter: drop-shadow(0 0 4px var(--yellow)); }
+
+#links polyline.lead { stroke-dasharray: none; stroke-width: 1.5; filter: drop-shadow(0 0 3px var(--yellow)); }
+
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <!-- background -->
+  <div class="dots"></div>
+  <div class="blocks">
+    <span style="left:60px;  top:120px; width:220px; height:520px"></span>
+    <span style="left:300px; top:60px;  width:140px; height:300px"></span>
+    <span style="left:1650px;top:90px;  width:230px; height:600px"></span>
+    <span style="left:1480px;top:180px; width:150px; height:260px"></span>
+    <span style="left:520px; top:720px; width:880px; height:260px"></span>
+    <span style="left:140px; top:760px; width:300px; height:220px"></span>
+  </div>
+
+  <!-- corner plates: BEHIND the green frame lines -->
+  <svg class="corners" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;left:0;top:0">
+    <g fill="var(--corner)">
+      <polygon points="0,0 190,0 176,10 44,10 10,44 10,190 0,204"/>
+      <polygon points="1920,0 1730,0 1744,10 1876,10 1910,44 1910,190 1920,204"/>
+      <polygon points="0,1080 190,1080 176,1070 44,1070 10,1036 10,890 0,876"/>
+      <polygon points="1920,1080 1730,1080 1744,1070 1876,1070 1910,1036 1910,890 1920,876"/>
+    </g>
+  </svg>
+
+  <!-- green border frame -->
+  <svg class="frame" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;left:0;top:0">
+    <g fill="none" stroke="var(--accent)" stroke-width="1.5" opacity=".85">
+      <path class="draw" pathLength="1" d="M0,34 L520,34 L548,14 L1372,14 L1400,34 L1920,34"/>
+      <path class="draw" pathLength="1" d="M1920,1046 L1400,1046 L1372,1066 L548,1066 L520,1046 L0,1046"/>
+      <path class="draw" pathLength="1" d="M28,1080 L28,750 L46,730 L46,350 L28,330 L28,0"/>
+      <path class="draw" pathLength="1" d="M1892,0 L1892,330 L1874,350 L1874,730 L1892,750 L1892,1080"/>
+    </g>
+    <g class="late">
+      <g stroke="var(--accent)" stroke-width="5">
+        <path d="M580,14 L780,14 M796,14 L812,14 M824,14 L832,14"/>
+        <path d="M1140,1066 L1340,1066 M1108,1066 L1124,1066 M1088,1066 L1096,1066"/>
+        <path d="M46,380 L46,520"/><path d="M1874,560 L1874,700"/>
+      </g>
+      <g fill="var(--accent)">
+        <circle cx="548" cy="14" r="3.5"/><circle cx="1372" cy="14" r="3.5"/>
+        <circle cx="548" cy="1066" r="3.5"/><circle cx="1372" cy="1066" r="3.5"/>
+        <circle cx="46" cy="350" r="3.5"/><circle cx="46" cy="730" r="3.5"/>
+        <circle cx="1874" cy="350" r="3.5"/><circle cx="1874" cy="730" r="3.5"/>
+        <polygon points="60,40 104,40 112,46 104,52 60,52"/>
+        <polygon points="118,40 130,40 138,46 130,52 118,52 126,46" opacity=".55"/>
+        <polygon points="142,40 154,40 162,46 154,52 142,52 150,46" opacity=".25"/>
+        <polygon points="1860,1028 1816,1028 1808,1034 1816,1040 1860,1040"/>
+        <polygon points="1802,1028 1790,1028 1782,1034 1790,1040 1802,1040 1794,1034" opacity=".55"/>
+        <polygon points="1778,1028 1766,1028 1758,1034 1766,1040 1778,1040 1770,1034" opacity=".25"/>
+      </g>
+      <g font-family="JetBrains Mono, monospace" font-size="11" letter-spacing="2" fill="var(--muted)">
+        <text x="60" y="24">NBL-01 // SYS.ONLINE</text>
+        <text x="1860" y="24" text-anchor="end">ON AIR // 03</text>
+        <text x="960" y="1057" text-anchor="middle">NEBULA · BROADCAST SYSTEM</text>
+      </g>
+      <circle r="4" fill="var(--accent)"><animateMotion dur="12s" repeatCount="indefinite" path="M0,34 L520,34 L548,14 L1372,14 L1400,34 L1920,34"/></circle>
+      <circle r="4" fill="var(--accent)"><animateMotion dur="12s" begin="-6s" repeatCount="indefinite" path="M1920,1046 L1400,1046 L1372,1066 L548,1066 L520,1046 L0,1046"/></circle>
+    </g>
+  </svg>
+
+  <div id="ambient"></div>
+
+
+  <div class="src" id="cam">
+    <div class="bar"></div>
+    <i class="bk tl"></i><i class="bk tr"></i><i class="bk bl"></i><i class="bk br"></i>
+    <div class="ph"><b>WEBCAM</b><span>1224 × 702 · put the cam source here</span></div>
+    <div class="fine"><b>CAM.FEED</b> // NBL-01 // 1080p60</div>
+    <div class="fine r">REC <b>●</b></div>
+  </div>
+
+  <div class="src" id="chat">
+    <div class="bar"></div>
+    <i class="bk tl"></i><i class="bk tr"></i><i class="bk bl"></i><i class="bk br"></i>
+    <div class="chead"><span>// CHAT</span><span>TW · YT · KICK</span></div>
+    <div class="ph"><span>combined chat source</span><span>(Social Stream Ninja)</span></div>
+    <div class="fine"><b>CHAT.RELAY</b> // 3 UPLINKS</div>
+  </div>
+
+  <div class="socials">TWITCH · YOUTUBE · KICK <b class="wt">/[HANDLE]</b></div>
+
+  <div class="scan"></div>
+  <div class="vignette"></div>
+  <!-- header + brand sit ABOVE the scanlines + vignette so they never get dimmed -->
+  <div class="header">
+    <div class="left">
+      <span class="tag">// LIVE SESSION</span>
+      <h1 class="wt">LOADING<span class="ell"></span></h1>
+    </div>
+    <span class="live"><i></i><span class="wt">LIVE</span></span>
+  </div>
+  <div class="tagname"><i></i><span id="brand"></span></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const cssMs = name => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+/* ---------- squares: one drill step at a time ---------- */
+function makeMarker(x, y, label, yellow) {
+  const m = document.createElement('div');
+  m.className = 'marker' + (yellow ? ' y' : '');
+  m.style.left = x + 'px'; m.style.top = y + 'px';
+  m.dataset.l = label;
+  m.innerHTML = '<span class="lbl"></span>';
+  return m;
+}
+async function mAppear(m)  { m.classList.add('show'); await wait(cssMs('--zoom-in')); }       // 1. box zooms in
+async function mType(m) {                                                                       // 2. text writes out
+  const lbl = m.querySelector('.lbl'), txt = m.dataset.l;
+  lbl.classList.add('typing');
+  for (let i = 1; i <= txt.length; i++) { lbl.textContent = txt.slice(0, i); await wait(45); }
+  lbl.classList.remove('typing');
+}
+async function mRetract(m) { m.classList.add('retract'); await wait(350); }                    // 3. text slides into box
+async function mVanish(m)  { m.classList.remove('show'); m.classList.add('vanish'); await wait(cssMs('--zoom-out')); } // 4. box zooms out
+
+/* ---------- ambient squares: rare, and ONLY in the free margins (people are watching the cam here) ---------- */
+const LABELS = ['UPLINK.OK','SIG.LOCK','PKT_0x3A','NODE_07','CH.RELAY','SYNC.OK','BUF_0x9C','NBL_SYS_0x1F'];
+const ZONES = [ {x1:  640, y1:  66, x2: 1300, y2: 118},    // header, between title and LIVE
+                {x1:  900, y1: 960, x2: 1640, y2: 1000} ]; // bottom strip
+function spawnLoop() {
+  if ($('ambient').children.length === 0) {
+    const z = ZONES[Math.floor(Math.random() * ZONES.length)];
+    const x = Math.round(z.x1 + Math.random() * (z.x2 - z.x1)), y = Math.round(z.y1 + Math.random() * (z.y2 - z.y1));
+    const m = makeMarker(x, y, LABELS[Math.floor(Math.random() * LABELS.length)], true);
+    $('ambient').appendChild(m);
+    (async () => {
+      await mAppear(m); await mType(m);
+      await wait(2500 + Math.random() * 1500);
+      await mRetract(m); await mVanish(m); m.remove();
+    })();
+  }
+  setTimeout(spawnLoop, 8000 + Math.random() * 6000);   // one every 8-14s, never two at once
+}
+
+/* ---------- on load ---------- */
+if (location.search.includes('obs')) document.body.classList.add('obs');
+
+/* ---------- NEBULA wordmark: Iceberg + 35-degree slash across the whole N (built as SVG so the cut is real) ---------- */
+async function brandMark(host, size) {
+  await document.fonts.load(`400 ${size}px 'Iceberg'`);
+  const NS = 'http://www.w3.org/2000/svg', mk = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); p && p.appendChild(e); return e; };
+  const c = document.createElement('canvas'); c.width = size * 2; c.height = size * 2;
+  const g = c.getContext('2d'); g.font = `400 ${size}px 'Iceberg'`;
+  // ink edges of the N (where the slash starts and ends)
+  g.fillStyle = '#fff'; const ox = size * .2, base = size * 1.4; g.fillText('N', ox, base);
+  const asc = g.measureText('N').actualBoundingBoxAscent, row = g.getImageData(0, Math.round(base - asc * .5), c.width, 1).data;
+  let nL = null, nR = null; for (let x = 0; x < c.width; x++) if (row[x * 4 + 3] > 128) { nL ??= x - ox; nR = x - ox; }
+  // letter positions
+  const sp = size * .1, xs = []; let x = 0;
+  for (const ch of 'NEBULA') { xs.push(x); x += g.measureText(ch).width + sp; }
+  const W = x - sp, und = size * .07, top = -asc, H = asc, pad = 4;
+  const svg = mk('svg', { viewBox: `${-pad} ${top - pad} ${W + und + pad * 2} ${H + und + pad * 2}`, width: W + und + pad * 2, height: H + und + pad * 2 }, host);
+  const id = 'brandcut' + Math.random().toString(36).slice(2, 7);
+  const mask = mk('mask', { id, maskUnits: 'userSpaceOnUse', x: -pad, y: top - pad, width: W + und + pad * 2, height: H + und + pad * 2 }, mk('defs', {}, svg));
+  mk('rect', { x: -pad, y: top - pad, width: W + und + pad * 2, height: H + und + pad * 2, fill: '#fff' }, mask);
+  const xa = nL - 2, xb = nR + 2 + und, mid = top + H * .5, rise = (xb - xa) * Math.tan(35 * Math.PI / 180), gap = Math.max(1.5, size * .05);
+  mk('polygon', { points: `${xa},${mid + rise / 2 - gap / 2} ${xb},${mid - rise / 2 - gap / 2} ${xb},${mid - rise / 2 + gap / 2} ${xa},${mid + rise / 2 + gap / 2}`, fill: '#000' }, mask);
+  for (const [dx, fill] of [[und, 'var(--accent)'], [0, 'var(--white)']])
+    [...'NEBULA'].forEach((ch, i) => {
+      const t = mk('text', { x: xs[i] + dx, y: dx, 'font-family': 'Iceberg', 'font-size': size, fill }, svg);
+      if (i === 0) t.setAttribute('mask', `url(#${id})`);
+      t.textContent = ch;
+    });
+}
+
+window.addEventListener('load', async () => {
+  brandMark($('brand'), 52);   // ~same width as the LOADING header
+  $('stage').classList.add('on');
+  await wait(350);  $('cam').classList.add('open');
+  await wait(200);  $('chat').classList.add('open');
+  await wait(4000); spawnLoop();
+});
+
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  const st = $('stage'); st.style.transformOrigin = '0 0'; st.style.transform = `scale(${s})`;
+}
+addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

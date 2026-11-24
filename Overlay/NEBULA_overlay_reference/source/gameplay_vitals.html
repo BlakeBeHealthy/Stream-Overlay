@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NEBULA — gameplay vitals plate</title>
+<style>
+@font-face { font-family: 'Iceberg'; src: url('../assets/fonts/iceberg-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; src: url('../assets/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); font-weight: 500; }
+:root {
+  --accent: #39FF88; --accent-light: hsl(145, 100%, 80%);
+  --purple: hsl(286, 90%, 59%); --yellow: hsl(54, 100%, 55%);
+  --white: #FFFFFF; --muted: #9FB8A8; --base: #0A0D0B;
+}
+/* OBS needs to see through everything that isn't the overlay */
+html, body { margin: 0; background: transparent; overflow: hidden; }
+body { font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<!-- 1920x1080 transparent page. Only the plate is drawn, bottom-left, over the Apex health HUD. -->
+<div id="stage" style="position: relative; width: 1920px; height: 1080px;">
+<svg width="480" height="170" viewBox="0 0 480 170" style="position: absolute; left: 0; top: 880px; overflow: visible">
+  <defs>
+    <!-- static dot-matrix, same texture as the other screens -->
+    <pattern id="vDots" width="5" height="5" patternUnits="userSpaceOnUse">
+      <circle cx="1.25" cy="1.25" r=".85" fill="#39FF88" opacity=".22"/>
+    </pattern>
+    <!-- the ONE moving thing on gameplay: thin light-green hatch drifting slowly along the diagonal -->
+    <pattern id="vHatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)">
+      <rect x="0" y="0" width="1.5" height="16" fill="hsl(145, 100%, 80%)" opacity=".3"/>
+      <animateTransform attributeName="patternTransform" type="translate" from="0 0" to="32 0" dur="3.2s" additive="sum" repeatCount="indefinite"/>
+    </pattern>
+    <linearGradient id="vShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#39FF88" stop-opacity=".10"/><stop offset=".55" stop-color="#39FF88" stop-opacity="0"/>
+    </linearGradient>
+    <!-- plate + holes. evenodd = the holes are see-through so the real Apex HUD shows. DO NOT change this shape. -->
+    <clipPath id="vitalsPlate"><path d="M11,47 L20,35 L239,35 L243,29 L389,29 L408,69 L439,138 L432,152 L80,152 L51,88 L36,90 Z M14,46 L22,39 L71,39 L79,46.5 L49.5,87 L37,87 Z M82,38 L286,38 L302,71 L82,71 Z M287,31 L338,31 L357,72 L306,72 Z M341,31 L388,31 L406,68 L404,72 L359,72 Z M335,81 L367,81 L367,112 L335,112 Z M176,116 L218,116 L224,126 L176,126 Z M220,116 L265,116 L271,126 L225,126 Z M267,116 L312,116 L318,126 L272,126 Z M314,116 L359,116 L365,126 L319,126 Z M361,116 L406,116 L412,126 L366,126 Z M176,127 L411,127 L418,141 L176,141 Z" clip-rule="evenodd"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#vitalsPlate)">
+    <rect width="480" height="180" fill="#0A0D0B" opacity=".9"/>
+    <rect width="480" height="180" fill="url(#vDots)"/>
+    <rect width="480" height="180" fill="url(#vHatch)"/>
+    <rect width="480" height="180" fill="url(#vShade)"/>
+  </g>
+
+  <!-- outer edge -->
+  <path d="M11 47 L20 35 L239 35 L243 29 L389 29 L408 69 L439 138 L432 152 L80 152 L50.7 89.1 L36 90 Z" fill="none" stroke="#39FF88" stroke-width="2"/>
+  <!-- thin outlines on level badge, evo bar, perks, icon slot (NOT on shield/health holes) -->
+  <path d="M14,46 L22,39 L71,39 L79,46.5 L49.5,87 L37,87 Z M82,38 L286,38 L302,71 L82,71 Z M287,31 L338,31 L357,72 L306,72 Z M341,31 L388,31 L406,68 L404,72 L359,72 Z" fill="none" stroke="#39FF88" stroke-width="1"/>
+  <path d="M335,81 L367,81 L367,112 L335,112 Z" fill="none" stroke="hsl(54, 100%, 55%)" stroke-width="1"/>   <!-- icon slot: yellow, it's a "marker" -->
+  <!-- right perk edge: one straight diagonal, now the purple detail -->
+  <polyline points="389,29 408,69" fill="none" stroke="hsl(286, 90%, 59%)" stroke-width="3"/>
+  <!-- top tabs -->
+  <polygon points="256,23 380,23 375,29 251,29" fill="#39FF88"/>
+  <polygon points="24,29 60,29 56,35 20,35" fill="hsl(54, 100%, 55%)"/>
+  <!-- tiny labels -->
+  <text x="252" y="19" font-family="JetBrains Mono, monospace" font-size="7" letter-spacing="1.5" fill="#9FB8A8">NBL-01 // VITALS</text>
+  <!-- art slot: holds the slashed-N badge (no frame), swap for your own art if you want -->
+  <g id="badge"></g>
+</svg>
+<!-- name, Iceberg wordmark -->
+<div id="brand" style="position: absolute; left: 180px; top: 958px;"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+/* ---------- NEBULA wordmark: Iceberg + 35-degree slash across the whole N (built as SVG so the cut is real) ---------- */
+async function brandMark(host, size) {
+  await document.fonts.load(`400 ${size}px 'Iceberg'`);
+  const NS = 'http://www.w3.org/2000/svg', mk = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); p && p.appendChild(e); return e; };
+  const c = document.createElement('canvas'); c.width = size * 2; c.height = size * 2;
+  const g = c.getContext('2d'); g.font = `400 ${size}px 'Iceberg'`;
+  // ink edges of the N (where the slash starts and ends)
+  g.fillStyle = '#fff'; const ox = size * .2, base = size * 1.4; g.fillText('N', ox, base);
+  const asc = g.measureText('N').actualBoundingBoxAscent, row = g.getImageData(0, Math.round(base - asc * .5), c.width, 1).data;
+  let nL = null, nR = null; for (let x = 0; x < c.width; x++) if (row[x * 4 + 3] > 128) { nL ??= x - ox; nR = x - ox; }
+  // letter positions
+  const sp = size * .1, xs = []; let x = 0;
+  for (const ch of 'NEBULA') { xs.push(x); x += g.measureText(ch).width + sp; }
+  const W = x - sp, und = size * .07, top = -asc, H = asc, pad = 4;
+  const svg = mk('svg', { viewBox: `${-pad} ${top - pad} ${W + und + pad * 2} ${H + und + pad * 2}`, width: W + und + pad * 2, height: H + und + pad * 2 }, host);
+  const id = 'brandcut' + Math.random().toString(36).slice(2, 7);
+  const mask = mk('mask', { id, maskUnits: 'userSpaceOnUse', x: -pad, y: top - pad, width: W + und + pad * 2, height: H + und + pad * 2 }, mk('defs', {}, svg));
+  mk('rect', { x: -pad, y: top - pad, width: W + und + pad * 2, height: H + und + pad * 2, fill: '#fff' }, mask);
+  const xa = nL - 2, xb = nR + 2 + und, mid = top + H * .5, rise = (xb - xa) * Math.tan(35 * Math.PI / 180), gap = Math.max(1.5, size * .05);
+  mk('polygon', { points: `${xa},${mid + rise / 2 - gap / 2} ${xb},${mid - rise / 2 - gap / 2} ${xb},${mid - rise / 2 + gap / 2} ${xa},${mid + rise / 2 + gap / 2}`, fill: '#000' }, mask);
+  for (const [dx, fill] of [[und, 'var(--accent)'], [0, 'var(--white)']])
+    [...'NEBULA'].forEach((ch, i) => {
+      const t = mk('text', { x: xs[i] + dx, y: dx, 'font-family': 'Iceberg', 'font-size': size, fill }, svg);
+      if (i === 0) t.setAttribute('mask', `url(#${id})`);
+      t.textContent = ch;
+    });
+}
+
+/* slashed-N badge in the art slot (same cut as the wordmark) */
+async function badge() {
+  const size = 58;
+  await document.fonts.load(`400 ${size}px 'Iceberg'`);
+  const NS = 'http://www.w3.org/2000/svg', g = $('badge');
+  const c = document.createElement('canvas'); c.width = size * 2; c.height = size * 2; const x = c.getContext('2d');
+  x.font = `400 ${size}px 'Iceberg'`; x.fillStyle = '#fff'; const ox = size * .2, base = size * 1.4; x.fillText('N', ox, base);
+  const m = x.measureText('N'), asc = m.actualBoundingBoxAscent, row = x.getImageData(0, Math.round(base - asc * .5), c.width, 1).data;
+  let nL = null, nR = null; for (let i = 0; i < c.width; i++) if (row[i * 4 + 3] > 128) { nL ??= i - ox; nR = i - ox; }
+  const w = nR - nL, cx = 129, cy = 115;                       // centre of the art slot
+  const tx = cx - nL - w / 2, ty = cy + asc / 2;               // text origin so the N is centred
+  const und = size * .07, mid = ty - asc / 2, xa = tx + nL - 2, xb = tx + nR + 2 + und, rise = (xb - xa) * Math.tan(35 * Math.PI / 180), gap = size * .055;
+  const mask = document.createElementNS(NS, 'mask'); mask.id = 'badgecut';
+  mask.innerHTML = `<rect x="80" y="70" width="100" height="90" fill="#fff"/><polygon fill="#000" points="${xa},${mid + rise / 2 - gap / 2} ${xb},${mid - rise / 2 - gap / 2} ${xb},${mid - rise / 2 + gap / 2} ${xa},${mid + rise / 2 + gap / 2}"/>`;
+  g.appendChild(mask);
+  for (const [d, f] of [[und, '#39FF88'], [0, '#FFFFFF']]) {
+    const t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', tx + d); t.setAttribute('y', ty + d); t.setAttribute('font-family', 'Iceberg'); t.setAttribute('font-size', size);
+    t.setAttribute('fill', f); t.setAttribute('mask', 'url(#badgecut)'); t.textContent = 'N'; g.appendChild(t);
+  }
+}
+window.addEventListener('load', () => { brandMark($('brand'), 24); badge(); });
+
+/* scale the 1920x1080 page down to fit any preview window (in OBS at 1920x1080 this is scale 1 = no change) */
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080), st = document.getElementById('stage');
+  st.style.transformOrigin = '0 0'; st.style.transform = `scale(${s})`;
+}
+addEventListener('resize', fit); fit();
+
+</script>
+</body>
+</html>
